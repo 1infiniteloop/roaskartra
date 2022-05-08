@@ -11,7 +11,7 @@ const { Facebook: RoasFacebook } = require("roasfacebook");
 
 const ipEvents = curry((version, ip) => {
     let q = query(collection(db, "events"), where(version, "==", ip));
-    return from(getDocs(q)).pipe(rxmap(queryDocs));
+    return from(getDocs(q)).pipe(rxmap(Kartra.utilities.queryDocs));
 });
 
 const Timestamp = {
