@@ -4,7 +4,7 @@ const { size, isUndefined, isEmpty, toNumber, orderBy: lodashorderby, compact } 
 const { from, zip, of: rxof, catchError, throwError, iif, tap } = require("rxjs");
 const { concatMap, map: rxmap, filter: rxfilter, reduce: rxreduce, defaultIfEmpty } = require("rxjs/operators");
 const { query, where, getDocs, collection, limit, collectionGroup } = require("firebase/firestore");
-const { db } = require("../database");
+const { db } = require("./database");
 const { logroupby, lokeyby, louniqby, lofilter, pipeLog, loorderby } = require("helpers");
 const { get, all, mod, matching } = require("shades");
 const { Facebook: RoasFacebook } = require("roasfacebook");
