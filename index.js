@@ -582,3 +582,13 @@ const Kartra = {
 };
 
 exports.Kartra = Kartra;
+
+let roas_user_id = "yzJPEQHq7gh6nNRef1eX05HE5ec2";
+
+// from(getDocs(query(collection(db, "events"), where("roas_user_id", "==", roas_user_id), limit(1))))
+//     .pipe(rxmap(Kartra.utilities.queryDocs))
+//     .subscribe(pipeLog);
+
+// from(getDocs(query(collection(db, "kartra"), where("roas_user_id", "==", roas_user_id), limit(1))))
+//     .pipe(rxmap(Kartra.utilities.queryDocs))
+//     .subscribe(pipeLog);
