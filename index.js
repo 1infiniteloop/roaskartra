@@ -1,5 +1,25 @@
 const moment = require("moment-timezone");
-const { pick, map, pipe, values, head, identity, of, keys, curry, sum, flatten, not, uniq, paths, reject, mergeAll, toLower } = require("ramda");
+const {
+    pick,
+    map,
+    pipe,
+    values,
+    head,
+    identity,
+    of,
+    keys,
+    curry,
+    sum,
+    flatten,
+    not,
+    uniq,
+    paths,
+    reject,
+    mergeAll,
+    toLower,
+    anyPass,
+    hasPath,
+} = require("ramda");
 const { size, isUndefined, isEmpty, toNumber, orderBy: lodashorderby, compact } = require("lodash");
 const { from, zip, of: rxof, catchError, throwError, iif, tap } = require("rxjs");
 const { concatMap, map: rxmap, filter: rxfilter, reduce: rxreduce, defaultIfEmpty } = require("rxjs/operators");
@@ -9,8 +29,8 @@ const { logroupby, lokeyby, louniqby, lofilter, pipeLog, loorderby } = require("
 const { get, all, mod, matching } = require("shades");
 const { Facebook: RoasFacebook } = require("roasfacebook");
 
-const ipEvents = curry((version, ip) => {
-    let q = query(collection(db, "events"), where(version, "==", ip));
+const ipEvents = curry((version, ip, roas_user_id) => {
+    let q = query(collection(db, "events"), where(version, "==", ip), where("roas_user_id", "==", roas_user_id));
     return from(getDocs(q)).pipe(rxmap(Kartra.utilities.queryDocs));
 });
 
@@ -181,9 +201,13 @@ const Facebook = {
 
 const Event = {
     ad: {
-        id: ({ fb_ad_id, h_ad_id, ad_id } = {}) => {
+        id: ({ fb_ad_id, h_ad_id, ad_id, fb_id } = {}) => {
             let func_name = `Event:ad:id`;
             console.log(func_name);
+
+            if (fb_id) {
+                console.log("fb_id:", fb_id);
+            }
 
             if (ad_id) {
                 return ad_id;
@@ -210,30 +234,30 @@ const Event = {
     },
 
     get_utc_timestamp: (value) => {
-        console.log("get_utc_timestamp");
+        // console.log("get_utc_timestamp");
 
         let timestamp;
 
         if (get("created_at_unix_timestamp")(value)) {
             timestamp = get("created_at_unix_timestamp")(value);
-            console.log(timestamp);
+            // console.log(timestamp);
             return timestamp;
         }
 
         if (get("utc_unix_time")(value)) {
             let timestamp = get("utc_unix_time")(value);
-            console.log(timestamp);
+            // console.log(timestamp);
             return timestamp;
         }
 
         if (get("utc_iso_datetime")(value)) {
             let timestamp = pipe(get("utc_unix_time"), (value) => moment(value).unix())(value);
-            console.log(timestamp);
+            // console.log(timestamp);
             return timestamp;
         }
 
         timestamp = get("unix_datetime")(value);
-        console.log(timestamp);
+        // console.log(timestamp);
 
         if (!timestamp) {
             console.log("notimestamp");
@@ -250,14 +274,14 @@ const Events = {
             ipv4: ({ roas_user_id, ip }) => {
                 let func_name = "Events:user:get:ipv4";
                 console.log(func_name);
-                let events_query = query(collection(db, "user_events"), where("roas_user_id", "==", roas_user_id), where("ipv4", "==", ip));
+                let events_query = query(collection(db, "events"), where("roas_user_id", "==", roas_user_id), where("ipv4", "==", ip));
                 return from(getDocs(events_query)).pipe(rxmap((snapshot) => snapshot.docs.map((doc) => doc.data())));
             },
 
             ipv6: ({ roas_user_id, ip }) => {
                 let func_name = "Events:user:get:ipv6";
                 console.log(func_name);
-                let events_query = query(collection(db, "user_events"), where("roas_user_id", "==", roas_user_id), where("ipv6", "==", ip));
+                let events_query = query(collection(db, "events"), where("roas_user_id", "==", roas_user_id), where("ipv6", "==", ip));
                 return from(getDocs(events_query)).pipe(rxmap((snapshot) => snapshot.docs.map((doc) => doc.data())));
             },
         },
@@ -318,6 +342,8 @@ const Kartra = {
         rxreducer: rxreduce((prev, curr) => [...prev, ...curr]),
 
         queryDocs: (snapshot) => snapshot.docs.map((doc) => doc.data()),
+
+        has_ad_id: anyPass([hasPath(["fb_ad_id"]), hasPath(["h_ad_id"]), hasPath(["fb_id"]), hasPath(["ad_id"])]),
     },
 
     orders: {
@@ -502,17 +528,20 @@ const Kartra = {
             let customers_from_db_events = from(orders).pipe(
                 concatMap(identity),
                 concatMap((customer) => {
-                    let { ip_address } = customer;
+                    let { ip_address, roas_user_id } = customer;
 
-                    return zip([from(ipEvents("ipv4", ip_address)), from(ipEvents("ipv6", ip_address))]).pipe(
+                    return zip([from(ipEvents("ipv4", ip_address, roas_user_id)), from(ipEvents("ipv6", ip_address, roas_user_id))]).pipe(
                         rxmap(flatten),
+                        tap((value) => console.log("size ->", size(value))),
+                        rxmap(pipe(lofilter(Kartra.utilities.has_ad_id))),
+                        tap((value) => console.log("size <- ", size(value))),
                         concatMap(identity),
                         rxmap((event) => ({
                             ad_id: pipe(
-                                paths([["fb_ad_id"], ["h_ad_id"], ["fb_id"]]),
+                                paths([["fb_ad_id"], ["h_ad_id"], ["fb_id"], ["ad_id"]]),
                                 compact,
                                 uniq,
-                                reject((id) => id == "%7B%7Bad.id%7D%7D"),
+                                reject((id) => id == "%7B%7Bad.id%7D%7D" || id == "{{ad.id}}"),
                                 head
                             )(event),
                             timestamp: pipe(Event.get_utc_timestamp)(event),
@@ -583,7 +612,37 @@ const Kartra = {
 
 exports.Kartra = Kartra;
 
-let roas_user_id = "yzJPEQHq7gh6nNRef1eX05HE5ec2";
+// let user_id = "0kkoxAk90oerq6eWdo9u6R713Cq1";
+
+// let date = "2022-05-18";
+
+// from(getDocs(query(collection(db, "projects"), where("roas_user_id", "==", user_id))))
+//     .pipe(
+//         rxmap(Kartra.utilities.queryDocs),
+//         rxmap(lofilter((project) => project.shopping_cart_name !== undefined)),
+//         rxmap(head),
+//         concatMap((project) => {
+//             return from(
+//                 getDocs(query(collectionGroup(db, "integrations"), where("account_name", "==", "facebook"), where("user_id", "==", user_id)))
+//             ).pipe(
+//                 rxmap(Kartra.utilities.queryDocs),
+//                 rxmap(head),
+//                 rxmap((facebook) => ({ ...facebook, ...project }))
+//             );
+//         })
+//     )
+//     .subscribe((project) => {
+//         console.log("project");
+//         console.log(project);
+
+//         let { roas_user_id: user_id, fb_ad_account_id, payment_processor_id, shopping_cart_id } = project;
+//         let payload = { user_id, fb_ad_account_id, payment_processor_id, shopping_cart_id, date };
+
+//         Kartra.report.get(payload).subscribe((result) => {
+//             console.log("result");
+//             pipeLog(result);
+//         });
+//     });
 
 // from(getDocs(query(collection(db, "events"), where("roas_user_id", "==", roas_user_id), limit(1))))
 //     .pipe(rxmap(Kartra.utilities.queryDocs))
