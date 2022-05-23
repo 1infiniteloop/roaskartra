@@ -354,7 +354,7 @@ const Kartra = {
             if (!user_id) return throwError(`error:${func_name}:no user_id`);
             if (!date) return throwError(`error:${func_name}:no date`);
 
-            let { start: start_timestamp, end: end_timestamp } = Kartra.utilities.date_start_end_timestamps(date);
+            let { start: start_timestamp, end: end_timestamp } = Kartra.utilities.date_start_end_timestamps(date, date);
 
             return from(
                 getDocs(
