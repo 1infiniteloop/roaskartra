@@ -330,13 +330,23 @@ const Kartra = {
 
         date_pacific_time: (date, timezone = "America/Los_Angeles") => moment(date).tz(timezone),
 
+        // date_start_end_timestamps: (
+        //     start = moment().format("YYYY-MM-DD"),
+        //     end = moment().format("YYYY-MM-DD"),
+        //     timezone = "America/Los_Angeles"
+        // ) => ({
+        //     start: moment(Kartra.utilities.date_pacific_time(start, timezone)).add(1, "days").startOf("day").valueOf(),
+        //     end: moment(Kartra.utilities.date_pacific_time(end, timezone)).add(1, "days").endOf("day").valueOf(),
+        // }),
+
         date_start_end_timestamps: (
             start = moment().format("YYYY-MM-DD"),
             end = moment().format("YYYY-MM-DD"),
             timezone = "America/Los_Angeles"
+            // timezone = "America/New_York"
         ) => ({
-            start: moment(Kartra.utilities.date_pacific_time(start, timezone)).add(1, "days").startOf("day").valueOf(),
-            end: moment(Kartra.utilities.date_pacific_time(end, timezone)).add(1, "days").endOf("day").valueOf(),
+            start: Number(moment(start, "YYYY-MM-DD").tz(timezone).startOf("day").add(1, "hours").format("x")),
+            end: Number(moment(end, "YYYY-MM-DD").tz(timezone).endOf("day").add(1, "hours").format("x")),
         }),
 
         rxreducer: rxreduce((prev, curr) => [...prev, ...curr]),
@@ -368,6 +378,7 @@ const Kartra = {
             ).pipe(
                 rxmap((data) => data.docs.map((doc) => doc.data())),
                 rxmap(get(matching({ action: "buy_product" }))),
+                rxmap(pipeLog),
                 rxmap(mod(all)(({ lead, ...rest }) => ({ ...lead, ...rest }))),
                 rxmap(mod(all)(pick(["first_name", "email", "ip", "roas_user_id", "action_details", "created_at_unix_timestamp", "last_name"]))),
                 rxmap(
@@ -476,7 +487,13 @@ const Kartra = {
             let ip_address = pipe(uniq, head)([lead_ip, ip, gdpr_lead_status_ip]);
             let email = pipe(uniq, head)([lead_email, buyer_email, customer_email]);
 
+            if (email == "dr.starr.ramson@gmail.com") {
+                console.log("theordersfortheemailis");
+                console.log(orders);
+            }
+
             let line_items = pipe(
+                louniqby("transaction_id"),
                 mod(all)((order) => ({
                     price: pipe(get("price"))(order),
                     product_name: pipe(get("product_name"))(order),
@@ -512,7 +529,7 @@ const Kartra = {
                 rxmap(logroupby("email")),
                 rxmap(mod(all)(Kartra.customer.normalize)),
                 tap((customers) => {
-                    pipe(values, get(all, "ip_address"), uniq)(customers);
+                    pipe(values, get(all, "ip_address"), uniq, pipeLog)(customers);
                 }),
                 rxmap(values),
                 concatMap(identity),
@@ -523,6 +540,7 @@ const Kartra = {
                 })),
                 rxmap(of),
                 Kartra.utilities.rxreducer
+                // rxmap(pipeLog)
             );
 
             let customers_from_db_events = from(orders).pipe(
@@ -612,9 +630,8 @@ const Kartra = {
 
 exports.Kartra = Kartra;
 
-// let user_id = "0kkoxAk90oerq6eWdo9u6R713Cq1";
-
-// let date = "2022-05-18";
+let user_id = "0kkoxAk90oerq6eWdo9u6R713Cq1";
+let date = "2022-05-24";
 
 // from(getDocs(query(collection(db, "projects"), where("roas_user_id", "==", user_id))))
 //     .pipe(
@@ -640,7 +657,10 @@ exports.Kartra = Kartra;
 
 //         Kartra.report.get(payload).subscribe((result) => {
 //             console.log("result");
-//             pipeLog(result);
+//             // pipeLog(result);
+//             pipe(get("customers", all, "stats", "roassales"), values, sum, pipeLog)(result);
+//             pipe(get("customers", all, "stats", "roasrevenue"), values, sum, pipeLog)(result);
+//             pipe(get("customers", all, "email"), values, pipeLog)(result);
 //         });
 //     });
 
